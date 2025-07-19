@@ -1,0 +1,32 @@
+{
+  "name": "campusshield-mvp",
+  "version": "1.0.0",
+  "description": "Privacy-first campus safety platform",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "client:dev": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "campus",
+    "safety",
+    "privacy",
+    "anonymous",
+    "reporting",
+    "security"
+  ],
+  "author": "CampusShield Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "react-toastify": "^11.0.5"
+  }
+}
