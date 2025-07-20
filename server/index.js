@@ -72,8 +72,14 @@ app.use('/api/', limiter);
 app.use(compression());
 app.use(morgan('combined'));
 // Apply CORS globally before all routes
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ["http://localhost:3000"];
 app.use(cors({
-  origin: true, // Allow all origins for development
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
