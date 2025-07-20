@@ -232,6 +232,10 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
+  const assignedToId = isAssignedToObject(selectedReport.assignedTo)
+    ? selectedReport.assignedTo._id
+    : selectedReport.assignedTo;
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="card">
@@ -610,24 +614,27 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Assignment logic */}
-                {selectedReport.assignedTo && (
+                {assignedToId && assignedToId === currentUserId ? (
+                  <>
+                    <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
+                      You have taken this case.
+                    </div>
+                    {(selectedReport.status !== 'resolved' && selectedReport.status !== 'closed') && (
+                      <button
+                        className="btn-primary mb-4"
+                        onClick={() => {
+                          window.location.href = `/chat?reportId=${selectedReport.id}`;
+                        }}
+                      >
+                        Respond to Report
+                      </button>
+                    )}
+                  </>
+                ) : assignedToId ? (
                   <div className="bg-warning-50 border border-warning-200 rounded p-3 text-warning-800 mb-4">
                     Already taken by an admin.
                   </div>
-                )}
-                {selectedReport.assignedTo && (
-                  <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
-                    You have taken this case.
-                  </div>
-                )}
-                {(
-                  !selectedReport.assignedTo ||
-                  (isAssignedToObject(selectedReport.assignedTo)
-                    ? selectedReport.assignedTo._id === currentUserId
-                    : selectedReport.assignedTo === currentUserId
-                  )
-                ) && (
+                ) : (
                   <button
                     className="btn-primary mb-4"
                     onClick={async () => {
