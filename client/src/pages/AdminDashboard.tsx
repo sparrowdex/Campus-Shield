@@ -621,13 +621,17 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   )
                 }
-                {(
-                  !selectedReport.assignedTo ||
+                {selectedReport.assignedTo &&
                   (isAssignedToObject(selectedReport.assignedTo)
                     ? selectedReport.assignedTo._id === currentUserId
                     : selectedReport.assignedTo === currentUserId
+                  ) && (
+                    <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
+                      You have taken this case.
+                    </div>
                   )
-                ) && (
+                }
+                {(
                   !selectedReport.assignedTo && (
                     <button
                       className="btn-primary mb-4"
