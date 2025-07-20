@@ -17,11 +17,13 @@ const connectDB = async () => {
     const conn = await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000, // 10 second timeout
+      serverSelectionTimeoutMS: 30000, // 30 second timeout for Atlas
       socketTimeoutMS: 45000, // 45 second timeout
       maxPoolSize: 10,
       retryWrites: true,
-      w: 'majority'
+      w: 'majority',
+      ssl: true,
+      tlsAllowInvalidCertificates: false
     });
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);

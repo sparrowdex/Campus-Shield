@@ -1,0 +1,1 @@
+mongodb+srv://sreejadas0405:campushealth@campus-shield-cluster.v3gpr5g.mongodb.net/?retryWrites=true&w=majority&appName=campus-shield-cluster
