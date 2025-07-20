@@ -95,8 +95,11 @@ const Navbar: React.FC = () => {
                   {user.role === 'admin' && (
                     <span className="badge badge-info">Admin</span>
                   )}
+                  {user.role === 'moderator' && (
+                    <span className="badge badge-warning">Moderator</span>
+                  )}
                 </div>
-                {user.role !== 'admin' && (
+                {user && user.role !== 'admin' && user.role !== 'moderator' && (
                   <Link to="/request-admin" className="text-sm text-primary-600 hover:text-primary-500">
                     Request Admin
                   </Link>
@@ -176,6 +179,9 @@ const Navbar: React.FC = () => {
                 </span>
                 {user.role === 'admin' && (
                   <span className="badge badge-info">Admin</span>
+                )}
+                {user.role === 'moderator' && (
+                  <span className="badge badge-warning">Moderator</span>
                 )}
               </div>
             </div>
