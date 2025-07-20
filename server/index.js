@@ -117,4 +117,6 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`🚀 CampusShield server running on port ${PORT}`);
-  console.log(`
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
