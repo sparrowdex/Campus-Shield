@@ -36,7 +36,7 @@ const IncidentHeatMap: React.FC = () => {
     const fetchReports = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/reports', {
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

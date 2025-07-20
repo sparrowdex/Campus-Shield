@@ -27,7 +27,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Fetch notifications from backend
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/notifications');
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications`);
       if (res.data.success) {
         setNotifications(
           res.data.notifications.map((n: any) => ({
@@ -52,7 +52,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Add notification (persist to backend)
   const addNotification = async (notif: Omit<Notification, 'id' | 'read' | 'timestamp'>) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/notifications', notif);
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/notifications`, notif);
       if (res.data.success) {
         const n = res.data.notification;
         const newNotif: Notification = {
@@ -74,7 +74,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Mark notification as read (persist to backend)
   const markAsRead = async (id: string) => {
     try {
-      const res = await axios.patch(`http://localhost:5000/api/notifications/${id}/read`);
+      const res = await axios.patch(`${process.env.REACT_APP_API_URL}/api/notifications/${id}/read`);
       if (res.data.success) {
         setNotifications((prev) => prev.map(n => n.id === id ? { ...n, read: true } : n));
       }

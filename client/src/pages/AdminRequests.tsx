@@ -46,7 +46,7 @@ const AdminRequests: React.FC = () => {
 
   const fetchRequests = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/requests', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/requests`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -67,7 +67,7 @@ const AdminRequests: React.FC = () => {
 
   const handleReview = async (requestId: string, action: 'approve' | 'reject') => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/requests/${requestId}/${action}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/requests/${requestId}/${action}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

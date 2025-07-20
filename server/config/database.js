@@ -5,7 +5,7 @@ const connectDB = async () => {
   
   if (!mongoUri) {
     console.error('❌ MONGODB_URI environment variable is not set!');
-    console.log('💡 Please set MONGODB_URI in your Railway environment variables');
+    console.log('💡 Please set MONGODB_URI in your environment variables');
     return;
   }
 
@@ -54,7 +54,7 @@ const connectDB = async () => {
     console.error('🔍 Full error:', error);
     console.log('💡 To fix this:');
     console.log('   1. Check your MONGODB_URI environment variable');
-    console.log('   2. Ensure MongoDB service is running in Railway');
+    console.log('   2. Ensure MongoDB service is running');
     console.log('   3. Verify the connection string format');
     console.log('');
     

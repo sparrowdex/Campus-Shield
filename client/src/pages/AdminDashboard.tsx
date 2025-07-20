@@ -118,12 +118,12 @@ const AdminDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       const [statsRes, activeChatsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/stats', {
+        fetch(`${process.env.REACT_APP_API_URL}/api/admin/stats`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         }),
-        fetch('http://localhost:5000/api/admin/active-chats', {
+        fetch(`${process.env.REACT_APP_API_URL}/api/admin/active-chats`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -139,7 +139,7 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Fetch all reports
-      const reportsResponse = await fetch('http://localhost:5000/api/admin/reports', {
+      const reportsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -151,7 +151,7 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Fetch heatmap data
-      const heatmapResponse = await fetch('http://localhost:5000/api/reports/heatmap/data', {
+      const heatmapResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/reports/heatmap/data`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -171,7 +171,7 @@ const AdminDashboard: React.FC = () => {
 
   const updateReportStatus = async (reportId: string, newStatus: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/reports/${reportId}/status`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${reportId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -633,7 +633,7 @@ const AdminDashboard: React.FC = () => {
                       className="btn-primary mb-4"
                       onClick={async () => {
                         try {
-                          const response = await fetch(`http://localhost:5000/api/admin/reports/${selectedReport.id}/assign`, {
+                          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${selectedReport.id}/assign`, {
                             method: 'POST',
                             headers: {
                               'Authorization': `Bearer ${localStorage.getItem('token')}`

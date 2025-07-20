@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          const response = await axios.get('http://localhost:5000/api/auth/me');
+          const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/auth/me`);
           setUser(response.data.user);
         } catch (error) {
           localStorage.removeItem('token');
@@ -59,7 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
         email,
         password
       });
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (email: string, password: string, campusId?: string) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         email,
         password,
         campusId
@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const loginAnonymous = async (campusId?: string) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/anonymous', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/anonymous`, {
         campusId
       });
 
@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updatePreferences = async (preferences: any) => {
     try {
-      const response = await axios.put('http://localhost:5000/api/auth/preferences', preferences);
+      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/auth/preferences`, preferences);
       // Update user preferences in state if needed
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to update preferences');
@@ -122,7 +122,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const adminLogin = async (email: string, password: string) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/admin-login', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/admin-login`, {
         email,
         password
       });

@@ -1,54 +1,34 @@
 # Campus Shield Deployment Guide
 
-## 🚀 Railway Backend Deployment (Recommended First Step)
+## 🚀 Backend Deployment (Render Recommended)
 
 ### Prerequisites
 - GitHub account
-- Railway account (free at [railway.app](https://railway.app))
+- Render account (free at [render.com](https://render.com))
 
 ### Step 1: Prepare Your Repository
 1. Make sure your code is pushed to GitHub
-2. Ensure you have the `railway.json` file in your root directory
-3. Verify your `server/package.json` has the correct scripts
+2. Verify your `server/package.json` has the correct scripts
 
-### Step 2: Deploy to Railway
-
-#### Option A: Deploy via Railway Dashboard
-1. Go to [railway.app](https://railway.app) and sign up/login
-2. Click "New Project" → "Deploy from GitHub repo"
-3. Select your Campus Shield repository
-4. Choose the `server` directory as your source
-5. Railway will automatically detect it's a Node.js app
-
-#### Option B: Deploy via Railway CLI
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login to Railway
-railway login
-
-# Initialize project
-railway init
-
-# Deploy
-railway up
-```
+### Step 2: Deploy to Render
+1. Go to [render.com](https://render.com) and sign up/login
+2. Click "New Web Service" and connect your GitHub repo
+3. Set the root directory to `server`
+4. Set build command to `npm install` and start command to `node index.js`
+5. Add environment variables as needed
 
 ### Step 3: Set Up MongoDB Database
-1. In your Railway project dashboard, click "New"
-2. Select "Database" → "MongoDB"
-3. Railway will automatically create a MongoDB instance
-4. Copy the MongoDB connection string from the "Connect" tab
+1. Use MongoDB Atlas (see below) or Render's managed database
+2. Copy the MongoDB connection string
 
 ### Step 4: Configure Environment Variables
-In your Railway project dashboard, go to "Variables" and add:
+Add these to your Render service:
 
 ```env
 NODE_ENV=production
-PORT=5000
+PORT=10000
 CORS_ORIGIN=https://your-frontend-domain.vercel.app
-MONGODB_URI=your-railway-mongodb-connection-string
+MONGODB_URI=your-mongodb-atlas-connection-string
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 RATE_LIMIT_WINDOW=900000
 RATE_LIMIT_MAX_REQUESTS=100
@@ -61,34 +41,25 @@ REPORT_DATA_RETENTION_DAYS=730
 ```
 
 ### Step 5: Deploy and Test
-1. Railway will automatically deploy when you push to GitHub
-2. Check the deployment logs in Railway dashboard
+1. Render will automatically deploy when you push to GitHub
+2. Check the deployment logs in Render dashboard
 3. Test your API endpoints using the provided URL
-4. Health check: `https://your-app.railway.app/health`
+4. Health check: `https://your-app.onrender.com/health`
 
 ### Step 6: Get Your Backend URL
-- Railway will provide a URL like: `https://your-app-name.railway.app`
+- Render will provide a URL like: `https://your-app-name.onrender.com`
 - Save this URL for your frontend deployment
 
 ## 🔧 Troubleshooting
 
 ### Common Issues:
-1. **Build fails**: Check Railway logs for missing dependencies
+1. **Build fails**: Check Render logs for missing dependencies
 2. **Database connection fails**: Verify MongoDB URI in environment variables
 3. **CORS errors**: Update CORS_ORIGIN to match your frontend domain
-4. **Port issues**: Railway automatically sets PORT environment variable
+4. **Port issues**: Render automatically sets PORT environment variable
 
 ### Useful Commands:
-```bash
-# View Railway logs
-railway logs
-
-# Check deployment status
-railway status
-
-# Open Railway dashboard
-railway open
-```
+- View Render logs in the dashboard
 
 ## 📝 Next Steps
 After successful backend deployment:

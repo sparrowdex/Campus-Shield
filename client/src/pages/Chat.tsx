@@ -51,7 +51,7 @@ const Chat: React.FC = () => {
   useEffect(() => {
     // Connect to Socket.IO server
     const token = localStorage.getItem('token');
-    const socket = io('http://localhost:5000', {
+    const socket = io(process.env.REACT_APP_SOCKET_URL, {
       auth: { token },
       transports: ['websocket']
     });
@@ -77,7 +77,7 @@ const Chat: React.FC = () => {
         // Create the chat room if it doesn't exist
         const createRoom = async () => {
           try {
-            const response = await fetch('http://localhost:5000/api/chat/room', {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/chat/room`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -124,7 +124,7 @@ const Chat: React.FC = () => {
       // Fetch report status for the selected chat room
       const room = chatRooms.find(r => r._id === selectedRoom);
       if (room && room.reportId) {
-        fetch(`http://localhost:5000/api/reports/${room.reportId}`, {
+        fetch(`${process.env.REACT_APP_API_URL}/api/reports/${room.reportId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -163,7 +163,7 @@ const Chat: React.FC = () => {
 
   const fetchChatRooms = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/chat/rooms', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/chat/rooms`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -184,7 +184,7 @@ const Chat: React.FC = () => {
 
   const fetchMessages = async (roomId: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/chat/room/${roomId}/messages`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/chat/room/${roomId}/messages`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -206,7 +206,7 @@ const Chat: React.FC = () => {
     setSending(true);
     try {
       // Save message via REST API for persistence
-      await fetch(`http://localhost:5000/api/chat/room/${selectedRoom}/message`, {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/chat/room/${selectedRoom}/message`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

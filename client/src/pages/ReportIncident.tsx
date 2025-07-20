@@ -160,7 +160,7 @@ const ReportIncident: React.FC = () => {
         formDataToSend.append(`attachments`, file);
       });
 
-      const response = await fetch('http://localhost:5000/api/reports', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
