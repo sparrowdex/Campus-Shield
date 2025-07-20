@@ -27,8 +27,11 @@ const io = socketIo(server, {
   }
 });
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (non-blocking)
+connectDB().catch(err => {
+  console.error('Failed to connect to database:', err);
+  // Don't exit the process, let it continue
+});
 
 // Initialize Socket.io
 initializeSocket(io);
@@ -72,11 +75,15 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  const health = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  };
+  
+  res.status(200).json(health);
 });
 
 // API Routes
