@@ -611,52 +611,46 @@ const AdminDashboard: React.FC = () => {
                 )}
 
                 {/* Assignment logic */}
-                {selectedReport.assignedTo &&
-                  (isAssignedToObject(selectedReport.assignedTo)
-                    ? selectedReport.assignedTo._id !== currentUserId
-                    : selectedReport.assignedTo !== currentUserId
-                  ) && (
-                    <div className="bg-warning-50 border border-warning-200 rounded p-3 text-warning-800 mb-4">
-                      Already taken by an admin.
-                    </div>
-                  )
-                }
-                {selectedReport.assignedTo &&
+                {selectedReport.assignedTo && (
+                  <div className="bg-warning-50 border border-warning-200 rounded p-3 text-warning-800 mb-4">
+                    Already taken by an admin.
+                  </div>
+                )}
+                {selectedReport.assignedTo && (
+                  <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
+                    You have taken this case.
+                  </div>
+                )}
+                {(
+                  !selectedReport.assignedTo ||
                   (isAssignedToObject(selectedReport.assignedTo)
                     ? selectedReport.assignedTo._id === currentUserId
                     : selectedReport.assignedTo === currentUserId
-                  ) && (
-                    <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
-                      You have taken this case.
-                    </div>
                   )
-                }
-                {(
-                  !selectedReport.assignedTo && (
-                    <button
-                      className="btn-primary mb-4"
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${selectedReport.id}/assign`, {
-                            method: 'POST',
-                            headers: {
-                              'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            }
-                          });
-                          const data = await response.json();
-                          if (response.ok) {
-                            fetchDashboardData();
-                          } else {
-                            alert(data.message || 'Failed to assign report');
+                ) && (
+                  <button
+                    className="btn-primary mb-4"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${selectedReport.id}/assign`, {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
                           }
-                        } catch (err) {
-                          alert('Failed to assign report');
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                          fetchDashboardData();
+                        } else {
+                          alert(data.message || 'Failed to assign report');
                         }
-                      }}
-                    >
-                      Take Up Report
-                    </button>
-                  )
+                      } catch (err) {
+                        alert('Failed to assign report');
+                      }
+                    }}
+                  >
+                    Take Up Report
+                  </button>
                 )}
                 {/* Only show action buttons if not assigned or assigned to this admin */}
                 <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
