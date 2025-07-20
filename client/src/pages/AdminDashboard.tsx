@@ -79,9 +79,9 @@ const AdminDashboard: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const navigate = useNavigate();
-  const currentUserId = JSON.parse(localStorage.getItem('user') || '{}').id;
-  const [activeChats, setActiveChats] = useState<number>(0);
   const { user } = useAuth();
+  const currentUserId = user?.id;
+  const [activeChats, setActiveChats] = useState<number>(0);
 
   const statusColors = {
     pending: 'bg-warning-100 text-warning-800',
@@ -669,7 +669,8 @@ const AdminDashboard: React.FC = () => {
                     Take Up Report
                   </button>
                 )}
-                {/* Only show action buttons if not assigned or assigned to this admin */}
+
+                {/* Only show Close button in the modal footer */}
                 <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => setSelectedReport(null)}
@@ -677,24 +678,6 @@ const AdminDashboard: React.FC = () => {
                   >
                     Close
                   </button>
-                  {(
-                    !selectedReport.assignedTo ||
-                    (isAssignedToObject(selectedReport.assignedTo)
-                      ? selectedReport.assignedTo._id === currentUserId
-                      : selectedReport.assignedTo === currentUserId
-                    )
-                  ) && (
-                    <button
-                      onClick={() => {
-                        setSelectedReport(null);
-                        navigate(`/chat?reportId=${selectedReport.id}`);
-                      }}
-                      className="btn-primary"
-                    >
-                      <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
-                      Respond to Report
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
