@@ -10,9 +10,8 @@
     "build": "cd client && npm run build",
     "start": "cd server && npm start",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "railway:build": "echo 'Railway build - server only'",
-    "railway:start": "cd server && npm start"
+    "vercel-build": "npm run install:all && npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "campus",
