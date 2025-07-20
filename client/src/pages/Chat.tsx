@@ -278,8 +278,8 @@ const Chat: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto h-[calc(100vh-100px)]">
-      <div className="card h-full flex flex-col">
+    <div className="max-w-7xl mx-auto h-[calc(100vh-100px)] px-2 md:px-8">
+      <div className="card h-full flex flex-col w-full">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Anonymous Chat</h1>
           <div className="text-sm text-gray-500">
