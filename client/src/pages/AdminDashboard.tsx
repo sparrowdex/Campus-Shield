@@ -232,9 +232,12 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  const assignedToId = isAssignedToObject(selectedReport.assignedTo)
-    ? selectedReport.assignedTo._id
-    : selectedReport.assignedTo;
+  const assignedToId =
+    selectedReport && selectedReport.assignedTo
+      ? isAssignedToObject(selectedReport.assignedTo)
+        ? selectedReport.assignedTo._id
+        : selectedReport.assignedTo
+      : null;
 
   return (
     <div className="max-w-7xl mx-auto">
