@@ -1,0 +1,8 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Campus Shield Logo</title>
+  <g>
+    <path d="M24 4L8 10V20C8 33 24 44 24 44C24 44 40 33 40 20V10L24 4Z" fill="#2563eb"/>
+    <path d="M24 8V38" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <path d="M16 16H32" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg> 
