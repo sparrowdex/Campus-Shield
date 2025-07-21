@@ -79,7 +79,7 @@ CampusShield is a privacy-first campus safety platform for anonymous incident re
 
 ---
 
-## 💡 Why We Built This (Impact)
+## 💡 Why I Built This (Impact)
 
 - **Problem:** Students often hesitate to report safety incidents due to privacy concerns and lack of trust.
 - **Solution:** CampusShield enables anonymous, secure reporting and real-time support, empowering students and improving campus safety.
