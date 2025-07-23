@@ -74,8 +74,7 @@ router.post('/register', [
       }
 
       if (password) {
-        const salt = await bcrypt.genSalt(10);
-        userData.password = await bcrypt.hash(password, salt);
+        userData.password = password; // Let the pre-save hook handle hashing
       }
 
       const user = await User.create(userData);
