@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { gsap } from 'gsap';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   ShieldCheckIcon, 
@@ -20,6 +21,10 @@ const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const unread = notifications.filter(n => !n.read);
+  
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
+  const notifOverlayRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
@@ -41,6 +46,41 @@ const Navbar: React.FC = () => {
       { name: 'Admin Requests', href: '/admin/requests', current: false },
     ] : []),
   ];
+
+  // GSAP animation for mobile menu
+  useLayoutEffect(() => {
+    // Set initial state
+    gsap.set(mobileMenuRef.current, { height: 0, opacity: 0 });
+    
+    const animation = gsap.to(mobileMenuRef.current, {
+      height: 'auto',
+      opacity: 1,
+      duration: 0.4,
+      ease: 'power3.out',
+      paused: true,
+    });
+
+    if (isMenuOpen) {
+      animation.play();
+    } else {
+      animation.reverse();
+    }
+  }, [isMenuOpen]);
+
+  // GSAP animation for notification panel
+  const closeNotifPanel = () => {
+    const tl = gsap.timeline({ onComplete: () => setNotifOpen(false) });
+    tl.to(notifPanelRef.current, { x: '100%', duration: 0.3, ease: 'power2.in' })
+      .to(notifOverlayRef.current, { opacity: 0, duration: 0.3 }, '<');
+  };
+
+  useLayoutEffect(() => {
+    if (notifOpen) {
+      const tl = gsap.timeline();
+      tl.to(notifOverlayRef.current, { opacity: 1, duration: 0.3 })
+        .fromTo(notifPanelRef.current, { x: '100%' }, { x: '0%', duration: 0.4, ease: 'power3.out' }, '<');
+    }
+  }, [notifOpen]);
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 relative">
@@ -76,7 +116,7 @@ const Navbar: React.FC = () => {
                 {/* Notification Bell */}
                 <div className="relative">
                   <button
-                    className="relative focus:outline-none"
+                    className="relative p-1 focus:outline-none"
                     onClick={() => setNotifOpen(true)}
                   >
                     <BellIcon className="h-6 w-6 text-gray-600 hover:text-primary-600" />
@@ -143,8 +183,8 @@ const Navbar: React.FC = () => {
       </div>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="sm:hidden">
+      <div ref={mobileMenuRef} className="sm:hidden overflow-hidden">
+        <div className="sm:hidden"> {/* This extra div maintains padding when height is animated */}
           <div className="pt-2 pb-3 space-y-1">
             {navigation.map((item) => (
               <Link
@@ -228,21 +268,22 @@ const Navbar: React.FC = () => {
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Slide-in Notification Panel */}
       {notifOpen && (
         <div className="fixed inset-0 z-50 flex justify-end md:justify-end">
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-30 transition-opacity duration-300"
-            onClick={() => setNotifOpen(false)}
+            ref={notifOverlayRef}
+            className="fixed inset-0 bg-black bg-opacity-30 opacity-0"
+            onClick={closeNotifPanel}
           />
           {/* Panel */}
-          <div className="relative w-full max-w-md md:max-w-md h-full bg-white shadow-xl border-l border-gray-200 flex flex-col animate-slide-in-right md:rounded-none md:h-full md:w-full sm:max-w-full sm:w-full">
+          <div ref={notifPanelRef} className="relative w-full max-w-md md:max-w-md h-full bg-white shadow-xl border-l border-gray-200 flex flex-col md:rounded-none md:h-full md:w-full sm:max-w-full sm:w-full">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <span className="text-lg font-semibold text-gray-800">Notifications</span>
-              <button onClick={() => setNotifOpen(false)} className="p-2 rounded hover:bg-gray-100 md:p-1">
+              <button onClick={closeNotifPanel} className="p-2 rounded hover:bg-gray-100 md:p-1">
                 <XMarkIcon className="h-7 w-7 text-gray-500 md:h-6 md:w-6" />
               </button>
             </div>
@@ -256,7 +297,7 @@ const Navbar: React.FC = () => {
                     className="flex items-start justify-between bg-gray-50 rounded-lg p-4 shadow-sm hover:bg-primary-50 transition cursor-pointer group"
                   >
                     <div className="flex-1 pr-2 text-sm text-gray-800" onClick={async () => {
-                      await markAsRead(n.id);
+                      markAsRead(n.id);
                       setNotifOpen(false);
                       if (n.link) navigate(n.link);
                     }}>

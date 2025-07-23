@@ -9,11 +9,12 @@ import {
   CalendarIcon,
   FunnelIcon,
   XMarkIcon,
-  DocumentIcon
+  DocumentIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
-
+import axios from 'axios';
 interface Report {
   id: string;
   title: string;
@@ -47,6 +48,7 @@ const MyReports: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const statusColors = {
     pending: 'bg-warning-100 text-warning-800',
@@ -332,23 +334,30 @@ const MyReports: React.FC = () => {
                    </div>
                  )}
 
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => setSelectedReport(null)}
-                    className="btn-secondary"
-                  >
-                    Close
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedReport(null);
-                      navigate(`/chat?reportId=${selectedReport.id}`);
-                    }}
-                    className="btn-primary"
-                  >
-                    <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
-                    Chat with Authorities
-                  </button>
+                <div className="flex justify-end items-center pt-4 border-t border-gray-200">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() =>
+                        navigate(`/report/${selectedReport.id}/edit`, { state: { report: selectedReport } })
+                      }
+                      className="btn-secondary"
+                    >
+                      Edit Report
+                    </button>
+                    <button
+                      onClick={() => setSelectedReport(null)}
+                      className="btn-secondary"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => navigate(`/chat?reportId=${selectedReport.id}`)}
+                      className="btn-primary flex items-center"
+                    >
+                      <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
+                      Chat
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

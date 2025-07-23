@@ -13,18 +13,22 @@ const connectDB = async () => {
   console.log('📊 URI format check:', mongoUri.substring(0, 20) + '...');
 
   try {
-    // Try to connect to MongoDB with better error handling
-    const conn = await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 30000, // 30 second timeout for Atlas
+    const isAtlas = mongoUri.includes('mongodb+srv');
+
+    const connectionOptions = {
+      serverSelectionTimeoutMS: 30000, // 30 second timeout
       socketTimeoutMS: 45000, // 45 second timeout
       maxPoolSize: 10,
       retryWrites: true,
-      w: 'majority',
-      ssl: true,
-      tlsAllowInvalidCertificates: false
-    });
+    };
+
+    if (isAtlas) {
+      connectionOptions.w = 'majority';
+      connectionOptions.ssl = true;
+    }
+
+    // Try to connect to MongoDB with better error handling
+    const conn = await mongoose.connect(mongoUri, connectionOptions);
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     console.log(`📊 Database: ${conn.connection.name}`);

@@ -624,60 +624,61 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {assignedToIdStr && assignedToIdStr === currentUserIdStr ? (
-                  <>
-                    <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
-                      You have taken this case.
-                    </div>
-                    {(selectedReport.status !== 'resolved' && selectedReport.status !== 'closed') && (
-                      <button
-                        className="btn-primary mb-4"
-                        onClick={() => {
-                          window.location.href = `/chat?reportId=${selectedReport.id}`;
-                        }}
-                      >
-                        Respond to Report
-                      </button>
-                    )}
-                  </>
-                ) : assignedToIdStr ? (
+                {assignedToIdStr && assignedToIdStr === currentUserIdStr && (
+                  <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
+                    You have taken this case.
+                  </div>
+                )}
+                {assignedToIdStr && assignedToIdStr !== currentUserIdStr && (
                   <div className="bg-warning-50 border border-warning-200 rounded p-3 text-warning-800 mb-4">
                     Already taken by an admin.
                   </div>
-                ) : (
-                  <button
-                    className="btn-primary mb-4"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${selectedReport.id}/assign`, {
-                          method: 'POST',
-                          headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('token')}`
-                          }
-                        });
-                        const data = await response.json();
-                        if (response.ok) {
-                          fetchDashboardData();
-                        } else {
-                          alert(data.message || 'Failed to assign report');
-                        }
-                      } catch (err) {
-                        alert('Failed to assign report');
-                      }
-                    }}
-                  >
-                    Take Up Report
-                  </button>
                 )}
 
                 {/* Only show Close button in the modal footer */}
-                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <div className="flex justify-end items-center space-x-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => setSelectedReport(null)}
                     className="btn-secondary"
                   >
                     Close
                   </button>
+                  {!assignedToIdStr && (
+                    <button
+                      className="btn-primary"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`${process.env.REACT_APP_API_URL}/api/admin/reports/${selectedReport.id}/assign`, {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            }
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            fetchDashboardData();
+                            // Also update the selected report in state to reflect assignment
+                            setSelectedReport(prev => prev ? { ...prev, assignedTo: currentUserId } : null);
+                          } else {
+                            alert(data.message || 'Failed to assign report');
+                          }
+                        } catch (err) {
+                          alert('Failed to assign report');
+                        }
+                      }}
+                    >
+                      Take Up Report
+                    </button>
+                  )}
+                  {assignedToIdStr && assignedToIdStr === currentUserIdStr && selectedReport.status !== 'resolved' && selectedReport.status !== 'closed' && (
+                    <button
+                      className="btn-primary flex items-center"
+                      onClick={() => navigate(`/chat?reportId=${selectedReport.id}`)}
+                    >
+                      <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
+                      Respond to Report
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

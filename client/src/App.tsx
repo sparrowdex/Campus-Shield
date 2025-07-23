@@ -64,6 +64,14 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
+            path="/report/:reportId/edit"
+            element={
+              <ProtectedRoute>
+                <ReportIncident />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/my-reports"
             element={
               <ProtectedRoute>

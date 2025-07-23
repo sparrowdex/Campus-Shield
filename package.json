@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "gsap": "^3.13.0",
     "react-toastify": "^11.0.5"
   }
 }

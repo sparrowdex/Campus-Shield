@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs').promises;
 const { body, validationResult, query } = require('express-validator');
 const Report = require('../models/Report');
 const auth = require('../middleware/auth');
@@ -43,31 +44,63 @@ const upload = multer({
   }
 });
 
-// @route   POST /api/reports
-// @desc    Submit a new incident report
-// @access  Private
-router.post('/', auth, upload.array('attachments', 5), [
-  body('title').isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
-  body('description').isLength({ min: 10, max: 2000 }).withMessage('Description must be between 10 and 2000 characters'),
+// Middleware to handle nested form data from multer
+const handleNestedFormData = (req, res, next) => {
+  if (req.body && typeof req.body.location !== 'object') {
+    const location = {};
+    for (const key in req.body) {
+      if (key.startsWith('location[')) {
+        const match = key.match(/location\[(.*?)\]/);
+        if (match && match[1]) {
+          location[match[1]] = req.body[key];
+        }
+      }
+    }
+    req.body.location = location;
+  }
+  next();
+};
+
+// Shared validation rules for creating and updating reports
+const reportValidationRules = [
+  body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be between 5 and 200 characters'),
+  body('description').trim().isLength({ min: 10, max: 2000 }).withMessage('Description must be between 10 and 2000 characters'),
   body('category').isIn([
     'harassment', 'assault', 'theft', 'vandalism', 'suspicious_activity',
     'emergency', 'safety_hazard', 'discrimination', 'bullying', 'other'
   ]).withMessage('Invalid category'),
-  // Add a custom sanitizer for coordinates
+  
+  // Location validation
   body('location.coordinates').customSanitizer(value => {
     if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
+      try { return JSON.parse(value); } catch { return value; }
     }
     return value;
   }),
   body('location.coordinates').isArray({ min: 2, max: 2 }).withMessage('Location coordinates are required'),
-  body('location.coordinates.*').isFloat().withMessage('Coordinates must be numbers'),
-  body('incidentTime').optional().isISO8601().withMessage('Invalid date format')
-], async (req, res) => {
+  body('location.coordinates.*').isFloat({ min: -180, max: 180 }).withMessage('Coordinates must be valid numbers'),
+  
+  // Optional location fields
+  body('location.address').optional().trim().isLength({ max: 200 }),
+  body('location.building').optional().trim().isLength({ max: 100 }),
+  body('location.floor').optional().trim().isLength({ max: 20 }),
+
+  // Incident time validation
+  body('incidentTime').isISO8601().withMessage('Invalid date format'),
+
+  // Custom validation for attachments (optional)
+  body('attachments').optional().isArray({ max: 5 }).withMessage('You can upload a maximum of 5 files.')
+];
+
+// @route   POST /api/reports
+// @desc    Submit a new incident report
+// @access  Private
+router.post('/', 
+  auth, 
+  upload.array('attachments', 5), 
+  handleNestedFormData,
+  reportValidationRules,
+  async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -254,14 +287,17 @@ router.get('/', auth, [
         reports: reports.map(report => ({
           id: report._id,
           title: report.title,
+          description: report.description,
           category: report.category,
           status: report.status,
           priority: report.priority,
           location: report.location,
         incidentTime: report.incidentTime,
-        createdAt: report.createdAt,
-        assignedTo: report.assignedTo
-      })),
+          createdAt: report.createdAt,
+          assignedTo: report.assignedTo,
+          attachments: report.attachments || [],
+          publicUpdates: report.publicUpdates || []
+        })),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -301,6 +337,7 @@ router.get('/', auth, [
         reports: paginatedReports.map(report => ({
           id: report.id,
           title: report.title,
+          description: report.description,
           category: report.category,
           status: report.status,
           priority: report.priority,
@@ -383,6 +420,67 @@ router.get('/:id', auth, async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   PUT /api/reports/:id
+// @desc    Update a report
+// @access  Private (reporter only)
+router.put('/:id', 
+  auth, 
+  upload.array('attachments', 5), 
+  handleNestedFormData,
+  reportValidationRules,
+  async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    // Log the validation errors for easier debugging
+    console.error('Update Report Validation Errors:', errors.array());
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  try {
+    const report = await Report.findById(req.params.id);
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    // Only the original reporter can edit their report
+    if (report.reporterId.toString() !== req.user.userId.toString()) {
+      return res.status(403).json({ success: false, message: 'User not authorized to edit this report' });
+    }
+
+    const { title, description, category, incidentTime, location } = req.body;
+
+    // Update fields
+    report.title = title;
+    report.description = description;
+    report.category = category;
+    if (location) {
+      report.location.coordinates = location.coordinates;
+      report.location.address = location.address || '';
+      report.location.building = location.building || '';
+      report.location.floor = location.floor || '';
+    }
+    if (incidentTime) report.incidentTime = incidentTime;
+
+    // For this implementation, we are not handling attachment edits to keep it simple.
+    // A full implementation would handle adding/removing files.
+
+    report.updatedAt = Date.now();
+
+    const updatedReport = await report.save();
+
+    res.json({
+      success: true,
+      message: 'Report updated successfully',
+      report: updatedReport
+    });
+
+  } catch (error) {
+    console.error('Update report error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

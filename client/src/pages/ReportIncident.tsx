@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import { 
   MapPinIcon, 
   CameraIcon, 
@@ -11,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
-interface FormData {
+interface FormData { 
   title: string;
   description: string;
   category: string;
@@ -26,7 +27,9 @@ interface FormData {
 }
 
 const ReportIncident: React.FC = () => {
-  const { user } = useAuth();
+  const { reportId } = useParams<{ reportId?: string }>();
+  const isEditMode = !!reportId;
+  const { state } = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -44,10 +47,66 @@ const ReportIncident: React.FC = () => {
     attachments: []
   });
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+
+  useEffect(() => {
+    if (isEditMode) {
+      const passedReport = state?.report;
+
+      if (passedReport && passedReport.id === reportId) {
+        // If report data is passed via route state, use it directly
+        setFormData({
+          title: passedReport.title || '',
+          description: passedReport.description || '',
+          category: passedReport.category || '',
+          location: {
+            coordinates: passedReport.location?.coordinates || null,
+            address: passedReport.location?.address || '',
+            building: passedReport.location?.building || '',
+            floor: passedReport.location?.floor || ''
+          },
+          incidentTime: new Date(passedReport.incidentTime).toISOString().slice(0, 16),
+          attachments: [] // Attachments are not re-fetched for editing
+        });
+        setLoading(false);
+      } else if (reportId) {
+        // Fallback to fetching if no state is passed or ID doesn't match
+        const fetchReportData = async () => {
+          setLoading(true);
+          try {
+            const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/reports/${reportId}`);
+            if (response.data.success) {
+              const report = response.data.report;
+              setFormData({
+                title: report.title || '',
+                description: report.description || '',
+                category: report.category || '',
+                location: {
+                  coordinates: report.location?.coordinates || null,
+                  address: report.location?.address || '',
+                  building: report.location?.building || '',
+                  floor: report.location?.floor || ''
+                },
+                incidentTime: new Date(report.incidentTime).toISOString().slice(0, 16),
+                attachments: [] // Attachments are not re-fetched for editing
+              });
+            } else {
+              throw new Error(response.data.message || 'Failed to fetch report data.');
+            }
+          } catch (err: any) {
+            setError(err.response?.data?.message || err.message || 'Failed to fetch report data.');
+          } finally {
+            setLoading(false);
+          }
+        };
+        fetchReportData();
+      }
+    }
+  }, [isEditMode, reportId, state]);
 
   const categories = [
     { value: 'harassment', label: 'Harassment' },
@@ -156,40 +215,67 @@ const ReportIncident: React.FC = () => {
       formDataToSend.append('location[building]', formData.location.building);
       formDataToSend.append('location[floor]', formData.location.floor);
 
-      formData.attachments.forEach((file, index) => {
-        formDataToSend.append(`attachments`, file);
-      });
-
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formDataToSend
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit report');
+      // For simplicity, we only handle new file uploads when creating a report.
+      // Editing attachments would require a more complex UI and backend logic.
+      if (!isEditMode) {
+        formData.attachments.forEach((file) => {
+          formDataToSend.append(`attachments`, file);
+        });
       }
 
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/my-reports');
-      }, 2000);
+      const url = isEditMode
+        ? `${process.env.REACT_APP_API_URL}/api/reports/${reportId}`
+        : `${process.env.REACT_APP_API_URL}/api/reports`;
+
+      // The axios interceptor in AuthContext will now handle the token.
+      const response = isEditMode 
+        ? await axios.put(url, formDataToSend)
+        : await axios.post(url, formDataToSend);
+
+      if (response.data.success) {
+        setSuccess(true);
+        if (!isEditMode && response.data.report?.id) {
+          setSubmittedReportId(response.data.report.id);
+        }
+        setTimeout(() => {
+          navigate('/my-reports');
+        }, 8000); // Increased from 3 to 8 seconds
+      } else {
+        throw new Error(response.data.message || `Failed to ${isEditMode ? 'update' : 'submit'} report`);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to submit report');
+      setError(err.response?.data?.message || err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
-  const nextStep = () => {
-    if (currentStep === 1 && (!formData.title || !formData.description || !formData.category)) {
-      setError('Please fill in all required fields before continuing.');
-      return;
+  const isStepValid = () => {
+    if (currentStep === 1) {
+      return formData.title.trim() !== '' && 
+             formData.description.trim() !== '' && 
+             formData.category.trim() !== '';
     }
-    setCurrentStep(prev => prev + 1);
-    setError('');
+    if (currentStep === 2) {
+      // Location coordinates are required for the backend and heatmap functionality.
+      return formData.location.coordinates !== null;
+    }
+    // Step 3 has no validation needed to proceed to submission.
+    return true;
+  };
+
+  const nextStep = () => {
+    if (isStepValid()) {
+      setCurrentStep(prev => prev + 1);
+      setError('');
+    } else {
+      if (currentStep === 1) {
+        setError('Please fill in the title, category, and description.');
+      }
+      if (currentStep === 2) {
+        setError('Please provide a location by clicking "Use My Current Location". This is required for accurate reporting.');
+      }
+    }
   };
 
   const prevStep = () => {
@@ -202,13 +288,15 @@ const ReportIncident: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         <div className="card text-center">
           <CheckCircleIcon className="h-16 w-16 text-success-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Report Submitted Successfully!</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            Report {isEditMode ? 'Updated' : 'Submitted'} Successfully!
+          </h1>
           <p className="text-gray-600 mb-6">
             Your incident report has been submitted anonymously. You will receive updates on the status of your report.
           </p>
           <div className="bg-success-50 border border-success-200 rounded-lg p-4">
             <p className="text-sm text-success-700">
-              <strong>Report ID:</strong> {Date.now().toString().slice(-8)}
+              <strong>Report ID:</strong> {isEditMode ? reportId : submittedReportId}
             </p>
             <p className="text-sm text-success-700 mt-2">
               You can track your report in the "My Reports" section.
@@ -223,7 +311,9 @@ const ReportIncident: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <div className="card">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-6 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Report an Incident</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+            {isEditMode ? 'Edit Incident Report' : 'Report an Incident'}
+          </h1>
           <div className="flex items-center space-x-2 text-sm text-gray-500 whitespace-nowrap">
             <span>Step {currentStep} of 3</span>
             <div className="flex space-x-1">
@@ -248,7 +338,7 @@ const ReportIncident: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           {/* Step 1: Basic Information */}
           {currentStep === 1 && (
             <div className="space-y-6">
@@ -400,7 +490,7 @@ const ReportIncident: React.FC = () => {
             </div>
           )}
 
-          {/* Step 3: Attachments */}
+          {/* Step 3: Attachments (Disabled in edit mode for simplicity) */}
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4">
@@ -413,24 +503,30 @@ const ReportIncident: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn-secondary w-full"
-                >
-                  <DocumentIcon className="h-4 w-4 mr-2" />
-                  Choose Files
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*,video/*,audio/*,.pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </div>
+              {isEditMode ? (
+                <div className="text-center text-gray-500 p-4 bg-gray-100 rounded-lg">
+                  Attachment editing is not available. Please submit a new report if you need to add or change files.
+                </div>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn-secondary w-full"
+                  >
+                    <DocumentIcon className="h-4 w-4 mr-2" />
+                    Choose Files
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,video/*,audio/*,.pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </div>
+              )}
 
               {formData.attachments.length > 0 && (
                 <div className="space-y-2">
@@ -484,27 +580,30 @@ const ReportIncident: React.FC = () => {
               <div />
             )}
 
+            
             {currentStep < 3 ? (
               <button
                 type="button"
-                onClick={nextStep}
-                className="btn-primary"
+                onClick={nextStep} // This only moves to the next step
+                disabled={!isStepValid()}
+                className="btn-primary disabled:opacity-50"
               >
                 Next
               </button>
             ) : (
               <button
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={loading}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
                     <LoadingSpinner size="sm" color="white" />
-                    Submitting...
+                    {isEditMode ? 'Updating...' : 'Submitting...'}
                   </>
                 ) : (
-                  'Submit Report'
+                  isEditMode ? 'Update Report' : 'Submit Report'
                 )}
               </button>
             )}
