@@ -41,6 +41,7 @@ const Chat: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reportTitle, setReportTitle] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
@@ -206,7 +207,7 @@ const Chat: React.FC = () => {
     setSending(true);
     try {
       // Save message via REST API for persistence
-      await fetch(`${process.env.REACT_APP_API_URL}/api/chat/room/${selectedRoom}/message`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/chat/room/${selectedRoom}/message`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -214,12 +215,25 @@ const Chat: React.FC = () => {
         },
         body: JSON.stringify({ message: newMessage })
       });
-      // Optionally, still emit via Socket.IO for real-time updates
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to send message');
+      }
+
+      const data = await res.json();
+      setMessages(prev => [...prev, data.message]); // Optimistically add message to UI
+      setNewMessage('');
+
+      // Optionally, still emit via Socket.IO for real-time updates to other clients
+      // Note: The server's socket implementation should ideally handle broadcasting
+      // after persistence to avoid redundant client emits and potential duplicates.
+      // This emit here might be redundant if the server automatically broadcasts after save.
+      // If client receives duplicate messages, this emit should be removed.
       socketRef.current?.emit('send_message', {
         roomId: selectedRoom,
-        message: newMessage
+        message: data.message // Send the full message object from server response
       });
-      setNewMessage('');
     } catch (err: any) {
       setError(err.message);
     } finally {

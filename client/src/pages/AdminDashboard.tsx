@@ -78,6 +78,7 @@ const AdminDashboard: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [assignedToFilter, setAssignedToFilter] = useState('all'); // New state for assignment filter
   const navigate = useNavigate();
   const { user } = useAuth();
   const currentUserId = user?.id;
@@ -200,7 +201,21 @@ const AdminDashboard: React.FC = () => {
     const matchesStatus = filter === 'all' || report.status === filter;
     const matchesPriority = priorityFilter === 'all' || report.priority === priorityFilter;
     const matchesCategory = categoryFilter === 'all' || report.category === categoryFilter;
-    return matchesStatus && matchesPriority && matchesCategory;
+
+    // New assignment filter logic
+    let matchesAssignment = true;
+    if (assignedToFilter === 'me') {
+      const assignedToId = report.assignedTo
+        ? isAssignedToObject(report.assignedTo)
+          ? report.assignedTo._id
+          : report.assignedTo
+        : null;
+      matchesAssignment = String(assignedToId) === String(currentUserId);
+    } else if (assignedToFilter === 'unassigned') {
+      matchesAssignment = !report.assignedTo;
+    }
+
+    return matchesStatus && matchesPriority && matchesCategory && matchesAssignment;
   });
 
   const formatDate = (dateString: string) => {
@@ -402,6 +417,16 @@ const AdminDashboard: React.FC = () => {
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
+                {/* New: Assigned To Filter */}
+                <select
+                  value={assignedToFilter}
+                  onChange={(e) => setAssignedToFilter(e.target.value)}
+                  className="input-field text-sm w-full md:w-auto"
+                >
+                  <option value="all">All Assignments</option>
+                  <option value="me">Assigned to Me</option>
+                  <option value="unassigned">Unassigned</option>
+                </select>
               </div>
             </div>
           </div>
@@ -416,7 +441,7 @@ const AdminDashboard: React.FC = () => {
               </div>
             ) : (
               filteredReports.map((report) => (
-                <div key={report.id} className="bg-gray-50 rounded-lg p-4 shadow border border-gray-100">
+                <div key={report.id} className={`bg-gray-50 rounded-lg p-4 shadow border border-gray-100 ${String(report.assignedTo ? (isAssignedToObject(report.assignedTo) ? report.assignedTo._id : report.assignedTo) : null) === String(currentUserId) ? 'bg-blue-50' : ''}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold text-gray-900">{report.title}</span>
                     <span className={`badge ${statusColors[report.status as keyof typeof statusColors]}`}>{report.status.replace('_', ' ').toUpperCase()}</span>
@@ -427,6 +452,9 @@ const AdminDashboard: React.FC = () => {
                     <span className={`badge ${priorityColors[report.priority as keyof typeof priorityColors]}`}>{report.priority.toUpperCase()}</span>
                   </div>
                   <div className="text-xs text-gray-500 mb-2">{formatDate(report.createdAt)}</div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Assigned To: {report.assignedTo ? (isAssignedToObject(report.assignedTo) ? report.assignedTo.email : 'Assigned') : 'Unassigned'}
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setSelectedReport(report)}
@@ -436,7 +464,14 @@ const AdminDashboard: React.FC = () => {
                     </button>
                     <select
                       value={report.status}
-                      onChange={(e) => updateReportStatus(report.id, e.target.value)}
+                      onChange={(e) => {
+                        const newStatus = e.target.value;
+                        if (window.confirm(`Are you sure you want to change the status of "${report.title}" to ${newStatus.replace('_', ' ').toUpperCase()}?`)) {
+                          updateReportStatus(report.id, newStatus);
+                        } else {
+
+                        }
+                      }}
                       className="text-xs border border-gray-300 rounded px-2 py-1"
                     >
                       <option value="pending">Pending</option>
@@ -471,13 +506,16 @@ const AdminDashboard: React.FC = () => {
                     Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredReports.map((report) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
+                  <tr key={report.id} className={`hover:bg-gray-50 ${String(report.assignedTo ? (isAssignedToObject(report.assignedTo) ? report.assignedTo._id : report.assignedTo) : null) === String(currentUserId) ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{report.title}</div>
@@ -504,6 +542,9 @@ const AdminDashboard: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(report.createdAt)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {report.assignedTo ? (isAssignedToObject(report.assignedTo) ? report.assignedTo.email : 'Assigned') : 'Unassigned'}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
@@ -514,7 +555,14 @@ const AdminDashboard: React.FC = () => {
                         </button>
                         <select
                           value={report.status}
-                          onChange={(e) => updateReportStatus(report.id, e.target.value)}
+                          onChange={(e) => {
+                            const newStatus = e.target.value;
+                            if (window.confirm(`Are you sure you want to change the status of "${report.title}" to ${newStatus.replace('_', ' ').toUpperCase()}?`)) {
+                              updateReportStatus(report.id, newStatus);
+                            } else {
+
+                            }
+                          }}
                           className="text-xs border border-gray-300 rounded px-2 py-1"
                         >
                           <option value="pending">Pending</option>
@@ -601,9 +649,18 @@ const AdminDashboard: React.FC = () => {
                     <h4 className="font-medium text-gray-900 mb-2">Attachments</h4>
                     <div className="space-y-2">
                       {selectedReport.attachments.map((file, index) => (
-                        <div key={index} className="flex items-center space-x-2 text-sm text-gray-600">
-                          <DocumentIcon className="h-4 w-4" />
-                          <span>{file.originalName || file.filename || 'Unknown file'}</span>
+                        <div key={index} className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <DocumentIcon className="h-4 w-4" />
+                            <span>{file.originalName || file.filename || 'Unknown file'}</span>
+                          </div>
+                          <button
+                            onClick={() => window.open(`${process.env.REACT_APP_API_URL}/uploads/${file.filename}`, '_blank')}
+                            className="text-primary-600 hover:text-primary-900 p-1 rounded-full hover:bg-gray-100"
+                            title="View Attachment"
+                          >
+                            <EyeIcon className="h-4 w-4" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -624,14 +681,26 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {assignedToIdStr && assignedToIdStr === currentUserIdStr && (
-                  <div className="bg-success-50 border border-success-200 rounded p-3 text-success-800 mb-4">
-                    You have taken this case.
+                {selectedReport.assignedTo ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded p-3 text-gray-800 mb-4 flex items-center justify-between">
+                    <span>
+                      {assignedToIdStr && assignedToIdStr === currentUserIdStr
+                        ? 'You have taken this case.'
+                        : `Assigned to: ${isAssignedToObject(selectedReport.assignedTo) ? selectedReport.assignedTo.email : 'Unknown Admin'}`}
+                    </span>
+                    {assignedToIdStr && assignedToIdStr === currentUserIdStr && selectedReport.status !== 'resolved' && selectedReport.status !== 'closed' && (
+                        <button
+                          className="btn-primary flex items-center px-3 py-1 text-sm"
+                          onClick={() => navigate(`/chat?reportId=${selectedReport.id}`)}
+                        >
+                          <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
+                          Respond
+                        </button>
+                    )}
                   </div>
-                )}
-                {assignedToIdStr && assignedToIdStr !== currentUserIdStr && (
-                  <div className="bg-warning-50 border border-warning-200 rounded p-3 text-warning-800 mb-4">
-                    Already taken by an admin.
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded p-3 text-gray-800 mb-4">
+                    Unassigned
                   </div>
                 )}
 

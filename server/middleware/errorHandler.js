@@ -1,47 +1,94 @@
+const AppError = require('../utils/AppError');
+
+const handleCastErrorDB = err => {
+    const message = `Invalid ${err.path}: ${err.value}.`;
+    return new AppError(message, 400);
+};
+
+const handleDuplicateFieldsDB = err => {
+    const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
+    const message = `Duplicate field value: ${value}. Please use another value!`;
+    return new AppError(message, 400);
+};
+
+const handleValidationErrorDB = err => {
+    const errors = Object.values(err.errors).map(el => el.message);
+    const message = `Invalid input data. ${errors.join('. ')}`;
+    return new AppError(message, 400);
+};
+
+const handleJWTError = () => new AppError('Invalid token. Please log in again!', 401);
+
+const handleJWTExpiredError = () => new AppError('Your token has expired! Please log in again.', 401);
+
+const sendErrorDev = (err, res) => {
+    res.status(err.statusCode).json({
+        status: err.status,
+        error: err,
+        message: err.message,
+        stack: err.stack
+    });
+};
+
+const sendErrorProd = (err, res) => {
+    // Operational, trusted error: send message to client
+    if (err.isOperational) {
+        res.status(err.statusCode).json({
+            status: err.status,
+            message: err.message
+        });
+    // Programming or other unknown error: don't leak error details
+    } else {
+        // 1) Log error
+        console.error('ERROR 💥', err);
+
+        // 2) Send generic message
+        res.status(500).json({
+            status: 'error',
+            message: 'Something went very wrong!'
+        });
+    }
+};
+
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+    err.statusCode = err.statusCode || 500;
+    err.status = err.status || 'error';
 
-  // Default error
-  let error = {
-    message: err.message || 'Server Error',
-    statusCode: err.statusCode || 500
-  };
+    // Log the error in a structured format
+    const errorLog = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: err.message,
+        stack: err.stack,
+        request: {
+            method: req.method,
+            url: req.originalUrl,
+            ip: req.ip,
+        },
+    };
+    console.error(JSON.stringify(errorLog, null, 2));
 
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const messages = Object.values(err.errors).map(val => val.message);
-    error.message = messages.join(', ');
-    error.statusCode = 400;
-  }
 
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    error.message = 'Duplicate field value entered';
-    error.statusCode = 400;
-  }
+    // Sentry placeholder for production
+    if (process.env.NODE_ENV === 'production' && !err.isOperational) {
+        // In a real app, you would initialize Sentry and call Sentry.captureException(err);
+        console.log('Sending error to Sentry...');
+    }
 
-  // Mongoose cast error
-  if (err.name === 'CastError') {
-    error.message = 'Resource not found';
-    error.statusCode = 404;
-  }
+    if (process.env.NODE_ENV === 'development') {
+        sendErrorDev(err, res);
+    } else if (process.env.NODE_ENV === 'production') {
+        let error = { ...err };
+        error.message = err.message;
 
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    error.message = 'Invalid token';
-    error.statusCode = 401;
-  }
+        if (error.name === 'CastError') error = handleCastErrorDB(error);
+        if (error.code === 11000) error = handleDuplicateFieldsDB(error);
+        if (error.name === 'ValidationError') error = handleValidationErrorDB(error);
+        if (error.name === 'JsonWebTokenError') error = handleJWTError();
+        if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
 
-  if (err.name === 'TokenExpiredError') {
-    error.message = 'Token expired';
-    error.statusCode = 401;
-  }
-
-  res.status(error.statusCode).json({
-    success: false,
-    message: error.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+        sendErrorProd(error, res);
+    }
 };
 
 module.exports = { errorHandler }; 

@@ -1,14 +1,23 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const { body, validationResult } = require('express-validator');
-const User = require('../models/User');
-const auth = require('../middleware/auth');
-const memoryStore = require('../services/memoryStore');
-const AdminRequest = require('../models/AdminRequest');
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { z } = require("zod");
+const validate = require("../middleware/validate");
+const { v4: uuidv4 } = require("uuid");
+const User = require("../models/User");
+const auth = require("../middleware/auth");
+const memoryStore = require('../services/memoryStoreSingleton');
+const AdminRequest = require("../models/AdminRequest");
+const authService = require("../services/authService");
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * tags:
+ *   name: Authentication
+ *   description: User authentication and authorization
+ */
 
 // Add request logging middleware at the top of the file
 router.use((req, res, next) => {
@@ -16,596 +25,541 @@ router.use((req, res, next) => {
   next();
 });
 
-// Check if MongoDB is connected
-const isMongoConnected = () => {
-  return User.db.readyState === 1;
-};
+const registerSchema = z.object({
+  body: z.object({
+    email: z.string().email("Please enter a valid email").optional(),
+    password: z.string().min(6, "Password must be at least 6 characters").optional(),
+    campusId: z.string().optional(),
+  }),
+});
 
-// Generate JWT token
-const generateToken = (userId, role) => {
-  return jwt.sign(
-    { userId, role },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '7d' }
-  );
-};
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: Register a new user with an email and password, or as an anonymous user.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address.
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: User's password (at least 6 characters).
+ *               campusId:
+ *                 type: string
+ *                 description: ID of the campus the user belongs to.
+ *     responses:
+ *       201:
+ *         description: User registered successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     anonymousId:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     isAnonymous:
+ *                       type: boolean
+ *                     campusId:
+ *                       type: string
+ *       400:
+ *         description: Bad request (e.g., validation error, user already exists).
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  "/register",
+  validate(registerSchema),
+  async (req, res, next) => {
+    try {
+      const { user, accessToken, refreshToken } = await authService.registerUser(req.body);
 
-// @route   POST /api/auth/register
-// @desc    Register a new user (optional email/password)
-// @access  Public
-router.post('/register', [
-  body('email').optional().isEmail().withMessage('Please enter a valid email'),
-  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('campusId').optional().isString().withMessage('Campus ID must be a string')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { email, password, campusId } = req.body;
-    
-    // Generate anonymous ID
-    const anonymousId = uuidv4();
-    
-    // Use MongoDB if available, otherwise use memory store
-    if (isMongoConnected()) {
-      // Check if email already exists (if provided)
-      if (email) {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-          return res.status(400).json({
-            success: false,
-            message: 'User with this email already exists'
-          });
-        }
-      }
-
-      // Create user
-      const userData = {
-        anonymousId,
-        campusId,
-        isAnonymous: !email // Anonymous if no email provided
-      };
-
-      if (email) {
-        userData.email = email;
-      }
-
-      if (password) {
-        userData.password = password; // Let the pre-save hook handle hashing
-      }
-
-      const user = await User.create(userData);
-
-      // Generate token
-      const token = generateToken(user._id, user.role);
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
 
       res.status(201).json({
         success: true,
-        token,
-        user: {
-          id: user._id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
+        accessToken,
+        user,
       });
-    } else {
-      // Use memory store
-      if (email) {
-        const existingUser = memoryStore.findUserByEmail(email);
-        if (existingUser) {
-          return res.status(400).json({
-            success: false,
-            message: 'User with this email already exists'
-          });
-        }
-      }
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
-      // Create user in memory store
-      const userData = {
-        anonymousId,
-        campusId,
-        isAnonymous: !email,
-        email: email || null,
-        password: password ? await bcrypt.hash(password, 10) : null,
-        role: 'user'
-      };
+const loginSchema = z.object({
+  body: z.object({
+    email: z.string().email("Please enter a valid email"),
+    password: z.string().min(1, "Password is required"),
+  }),
+});
 
-      const user = memoryStore.createUser(userData);
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     description: Log in a user with their email and password.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: User logged in successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     anonymousId:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     isAnonymous:
+ *                       type: boolean
+ *                     campusId:
+ *                       type: string
+ *       400:
+ *         description: Invalid credentials.
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  "/login",
+  validate(loginSchema),
+  async (req, res, next) => {
+    try {
+      const { user, accessToken, refreshToken } = await authService.loginUser(req.body);
 
-      // Generate token
-      const token = generateToken(user.id, user.role);
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
+
+      res.json({
+        success: true,
+        accessToken,
+        user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+const anonymousSchema = z.object({
+  body: z.object({
+    campusId: z.string().optional(),
+  }),
+});
+
+/**
+ * @swagger
+ * /auth/anonymous:
+ *   post:
+ *     summary: Create an anonymous user session
+ *     description: Creates a session for a user without registration.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               campusId:
+ *                 type: string
+ *                 description: ID of the campus the user belongs to.
+ *     responses:
+ *       201:
+ *         description: Anonymous session created successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     anonymousId:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     isAnonymous:
+ *                       type: boolean
+ *                     campusId:
+ *                       type: string
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  "/anonymous",
+  validate(anonymousSchema),
+  async (req, res, next) => {
+    try {
+      const { user, accessToken, refreshToken } = await authService.loginAnonymousUser(req.body.campusId);
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
 
       res.status(201).json({
         success: true,
-        token,
-        user: {
-          id: user.id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
+        accessToken,
+        user,
       });
+    } catch (error) {
+      next(error);
     }
-
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration'
-    });
   }
+);
+
+const adminLoginSchema = z.object({
+  body: z.object({
+    email: z.string().email("Please enter a valid email"),
+    password: z.string().min(1, "Password is required"),
+  }),
 });
 
-// Enhanced /login route with detailed logging
-router.post('/login', [
-  body('email').isEmail().withMessage('Please enter a valid email'),
-  body('password').exists().withMessage('Password is required')
-], async (req, res) => {
-  try {
-    console.log('Login attempt:', req.body);
+/**
+ * @swagger
+ * /auth/admin-login:
+ *   post:
+ *     summary: Log in an administrator or moderator
+ *     description: Log in a user with administrative privileges.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Admin user logged in successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *       400:
+ *         description: Invalid credentials.
+ *       403:
+ *         description: Access denied.
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  "/admin-login",
+  validate(adminLoginSchema),
+  async (req, res, next) => {
+    try {
+      const { user, accessToken, refreshToken } = await authService.loginAdmin(req.body);
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { email, password } = req.body;
-
-    if (isMongoConnected()) {
-      const user = await User.findOne({ email });
-      if (!user) {
-        console.error('User not found for email:', email);
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials (user not found)'
-        });
-      }
-
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
-        console.error('Password mismatch for user:', email);
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials (password mismatch)'
-        });
-      }
-
-      await user.updateLastActive();
-
-      const token = generateToken(user._id, user.role);
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      });
 
       res.json({
         success: true,
-        token,
-        user: {
-          id: user._id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
+        accessToken,
+        user,
       });
-    } else {
-      // Use memory store
-      const user = memoryStore.findUserByEmail(email);
-      if (!user || !user.password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Check password
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Generate token
-      const token = generateToken(user.id, user.role);
-
-      res.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
-      });
+    } catch (error) {
+      next(error);
     }
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during login',
-      error: error.message,
-      stack: error.stack
-    });
   }
+);
+
+const requestAdminSchema = z.object({
+  body: z.object({
+    reason: z.string().min(10, "Reason must be between 10 and 500 characters").max(500, "Reason must be between 10 and 500 characters"),
+    role: z.string().min(1, "Role is required"),
+    department: z.string().min(1, "Department is required"),
+    experience: z.string().min(1, "Experience is required"),
+    responsibilities: z.string().min(1, "Responsibilities is required"),
+    urgency: z.enum(["low", "medium", "high", "critical"]),
+    contactInfo: z.string().optional(),
+  }),
 });
 
-// @route   POST /api/auth/anonymous
-// @desc    Create anonymous user session
-// @access  Public
-router.post('/anonymous', [
-  body('campusId').optional().isString().withMessage('Campus ID must be a string')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { campusId } = req.body;
-    
-    // Generate anonymous ID
-    const anonymousId = uuidv4();
-    
-    if (isMongoConnected()) {
-      // Create anonymous user
-      const user = await User.createAnonymousUser(anonymousId, campusId);
-
-      // Generate token
-      const token = generateToken(user._id, user.role);
-
-      res.status(201).json({
-        success: true,
-        token,
-        user: {
-          id: user._id,
-          anonymousId: user.anonymousId,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
-      });
-    } else {
-      // Use memory store
-      const userData = {
-        anonymousId,
-        campusId,
-        isAnonymous: true,
-        email: null,
-        password: null,
-        role: 'user'
-      };
-
-      const user = memoryStore.createUser(userData);
-
-      // Generate token
-      const token = generateToken(user.id, user.role);
-
-      res.status(201).json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          anonymousId: user.anonymousId,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
-      });
-    }
-
-  } catch (error) {
-    console.error('Anonymous auth error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during anonymous authentication'
-    });
-  }
-});
-
-// Enhanced /admin-login route with detailed logging
-router.post('/admin-login', [
-  body('email').isEmail().withMessage('Please enter a valid email'),
-  body('password').exists().withMessage('Password is required')
-], async (req, res) => {
-  try {
-    console.log('Admin login attempt:', req.body);
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.error('Validation errors:', errors.array());
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { email, password } = req.body;
-
-    if (isMongoConnected()) {
-      const user = await User.findOne({ email });
-      if (!user) {
-        console.error('Admin user not found for email:', email);
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials (user not found)'
-        });
-      }
-
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
-        console.error('Admin password mismatch for user:', email);
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials (password mismatch)'
-        });
-      }
-
-      if (user.role !== 'admin' && user.role !== 'moderator') {
-        console.error('User does not have admin/moderator role:', email, user.role);
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Administrative privileges required.'
-        });
-      }
-
-      const token = generateToken(user._id, user.role);
-
-      res.json({
-        success: true,
-        token,
-        user: {
-          id: user._id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
-      });
-    } else {
-      // Use memory store
-      const user = memoryStore.findUserByEmail(email);
-      if (!user || !user.password) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Check password (with special handling for new admin accounts)
-      let isMatch = false;
-      if (user.email === 'normal@admin.com' && password === 'admin') {
-        isMatch = true;
-      } else if (user.email === 'Iapprove@admin.com' && password === 'approve') {
-        isMatch = true;
-      } else {
-        isMatch = await bcrypt.compare(password, user.password);
-      }
-      
-      if (!isMatch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid credentials'
-        });
-      }
-
-      // Only allow existing admins or moderators to login
-      if (user.role !== 'admin' && user.role !== 'moderator') {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Administrative privileges required.'
-        });
-      }
-
-      // Generate token
-      const token = generateToken(user.id, user.role);
-
-      res.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          anonymousId: user.anonymousId,
-          email: user.email,
-          role: user.role,
-          isAnonymous: user.isAnonymous,
-          campusId: user.campusId
-        }
-      });
-    }
-
-  } catch (error) {
-    console.error('Admin login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during admin login',
-      error: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-// @route   POST /api/auth/request-admin
-// @desc    Request admin privileges
-// @access  Private
-router.post('/request-admin', auth, [
-  body('reason').isLength({ min: 10, max: 500 }).withMessage('Reason must be between 10 and 500 characters'),
-  body('role').notEmpty().withMessage('Role is required'),
-  body('department').notEmpty().withMessage('Department is required'),
-  body('experience').notEmpty().withMessage('Experience is required'),
-  body('responsibilities').notEmpty().withMessage('Responsibilities is required'),
-  body('urgency').isIn(['low', 'medium', 'high', 'critical']).withMessage('Valid urgency level is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { reason, role, department, experience, responsibilities, urgency, contactInfo } = req.body;
-    const user = req.user;
-
-    if (isMongoConnected()) {
-      // Check for existing pending request
-      const existing = await AdminRequest.findOne({ userId: user.userId, status: 'pending' });
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          message: 'You already have a pending admin request'
-        });
-      }
-      // Create new admin request
-      const request = await AdminRequest.create({
-        userId: user.userId,
-        reason,
-        role,
-        department,
-        experience,
-        responsibilities,
-        urgency,
-        contactInfo: contactInfo || ''
-      });
+/**
+ * @swagger
+ * /auth/request-admin:
+ *   post:
+ *     summary: Request admin privileges
+ *     description: Allows an authenticated user to request admin or moderator roles by providing a reason and other details.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *               - role
+ *               - department
+ *               - experience
+ *               - responsibilities
+ *               - urgency
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: The reason for the admin request.
+ *               role:
+ *                 type: string
+ *                 description: The role being requested.
+ *               department:
+ *                 type: string
+ *                 description: The department of the user.
+ *               experience:
+ *                 type: string
+ *                 description: The user's relevant experience.
+ *               responsibilities:
+ *                 type: string
+ *                 description: The responsibilities the user will have.
+ *               urgency:
+ *                 type: string
+ *                 enum: [low, medium, high, critical]
+ *                 description: The urgency of the request.
+ *               contactInfo:
+ *                 type: string
+ *                 description: Optional contact information.
+ *     responses:
+ *       201:
+ *         description: Admin request submitted successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 request:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Bad request (e.g., pending request already exists).
+ *       401:
+ *         description: Unauthorized.
+ *       500:
+ *         description: Server error.
+ */
+router.post(
+  "/request-admin",
+  auth,
+  validate(requestAdminSchema),
+  async (req, res, next) => {
+    try {
+      const request = await authService.requestAdmin(req.user.userId, req.body);
       return res.status(201).json({
         success: true,
-        message: 'Admin request submitted successfully',
-        request: {
-          id: request._id,
-          status: request.status,
-          createdAt: request.createdAt
-        }
+        message: "Admin request submitted successfully",
+        request,
       });
-    } else {
-      // Use memory store
-      const existingRequests = memoryStore.getAdminRequests('pending');
-      const hasPendingRequest = existingRequests.some(req => req.userId === user.userId);
-      
-      if (hasPendingRequest) {
-        return res.status(400).json({
-          success: false,
-          message: 'You already have a pending admin request'
-        });
-      }
-
-      // Create admin request with survey data
-      const requestData = {
-        reason,
-        role,
-        department,
-        experience,
-        responsibilities,
-        urgency,
-        contactInfo: contactInfo || ''
-      };
-      const request = memoryStore.createAdminRequest(user.userId, requestData);
-
-      res.status(201).json({
-        success: true,
-        message: 'Admin request submitted successfully',
-        request: {
-          id: request.id,
-          status: request.status,
-          createdAt: request.createdAt
-        }
-      });
+    } catch (error) {
+      next(error);
     }
-
-  } catch (error) {
-    console.error('Admin request error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during admin request'
-    });
   }
+);
+
+/**
+ * @swagger
+ * /auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     description: Obtains a new access token by providing a valid refresh token. The refresh token is expected to be in an HTTP-only cookie.
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Access token refreshed successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized (e.g., invalid or missing refresh token).
+ */
+router.post("/refresh-token", async (req, res, next) => {
+    try {
+        const { accessToken, newRefreshToken } = await authService.refreshAuthToken(req.cookies.refreshToken);
+
+        res.cookie('refreshToken', newRefreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
+        res.json({
+            success: true,
+            accessToken,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Private
+router.post("/logout", auth, async (req, res, next) => {
+    try {
+        await authService.logoutUser(req.user.userId);
+        res.clearCookie('refreshToken');
+        res.json({ success: true, message: "Logged out successfully." });
+    } catch (error) {
+        next(error);
+    }
 });
 
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
-router.get('/me', auth, async (req, res) => {
+router.get("/me", auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
+    const user = await authService.getUserProfile(req.user.userId);
     res.json({
       success: true,
-      user: {
-        id: user._id,
-        anonymousId: user.anonymousId,
-        email: user.email,
-        role: user.role,
-        isAnonymous: user.isAnonymous,
-        campusId: user.campusId,
-        preferences: user.preferences
-      }
+      user,
     });
-
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    next(error);
   }
+});
+
+const preferencesSchema = z.object({
+  body: z.object({
+    notifications: z.boolean().optional(),
+    locationSharing: z.boolean().optional(),
+    language: z.string().optional(),
+  }),
 });
 
 // @route   PUT /api/auth/preferences
 // @desc    Update user preferences
 // @access  Private
-router.put('/preferences', auth, [
-  body('notifications').optional().isBoolean(),
-  body('locationSharing').optional().isBoolean(),
-  body('language').optional().isString()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, errors: errors.array() });
-    }
-
-    const { notifications, locationSharing, language } = req.body;
-    
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
+router.put(
+  "/preferences",
+  auth,
+  validate(preferencesSchema),
+  async (req, res, next) => {
+    try {
+      const preferences = await authService.updateUserPreferences(req.user.userId, req.body);
+      res.json({
+        success: true,
+        preferences,
       });
+    } catch (error) {
+      next(error);
     }
-
-    // Update preferences
-    if (notifications !== undefined) user.preferences.notifications = notifications;
-    if (locationSharing !== undefined) user.preferences.locationSharing = locationSharing;
-    if (language) user.preferences.language = language;
-
-    await user.save();
-
-    res.json({
-      success: true,
-      preferences: user.preferences
-    });
-
-  } catch (error) {
-    console.error('Update preferences error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
   }
-});
+);
 
-module.exports = router; 
+module.exports = router;

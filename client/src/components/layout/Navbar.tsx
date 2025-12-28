@@ -31,21 +31,27 @@ const Navbar: React.FC = () => {
     navigate('/');
   };
 
-  const navigation = [
-    { name: 'Home', href: '/', current: true },
-    ...(user && user.role === 'user' ? [
-      { name: 'Report Incident', href: '/report', current: false },
-      { name: 'My Reports', href: '/my-reports', current: false },
-      { name: 'Chat', href: '/chat', current: false },
-    ] : []),
-    ...(user?.role === 'admin' ? [
-      { name: 'Admin Dashboard', href: '/admin', current: false },
-      { name: 'Chat', href: '/chat', current: false },
-    ] : []),
-    ...(user?.role === 'moderator' ? [
-      { name: 'Admin Requests', href: '/admin/requests', current: false },
-    ] : []),
-  ];
+  const navigation = [{ name: 'Home', href: '/', current: true }];
+  if (user) {
+    if (user.role === 'user') {
+      navigation.push(
+        { name: 'My Dashboard', href: '/dashboard', current: false }, // New: User Dashboard
+        { name: 'Report Incident', href: '/report', current: false },
+        { name: 'My Reports', href: '/my-reports', current: false },
+        { name: 'Chat', href: '/chat', current: false }
+      );
+    } else if (user.role === 'admin') {
+      navigation.push(
+        { name: 'Admin Dashboard', href: '/admin', current: false },
+        { name: 'Chat', href: '/chat', current: false }
+      );
+    } else if (user.role === 'moderator') {
+      navigation.push(
+        { name: 'Admin Requests', href: '/admin/requests', current: false },
+        { name: 'Chat', href: '/chat', current: false }
+      );
+    }
+  }
 
   // GSAP animation for mobile menu
   useLayoutEffect(() => {

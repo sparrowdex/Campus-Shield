@@ -1,0 +1,59 @@
+services:
+  # MongoDB Database Service
+  mongo:
+    image: mongo:latest
+    container_name: campusshield-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - campusshield-net
+
+  # Backend Server Service
+  server:
+    build: ./server
+    container_name: campusshield-server
+    ports:
+      - "5000:5000"
+    environment:
+      # Use the 'mongo' service name as the hostname for the database
+      MONGODB_URI: mongodb://mongo:27017/campusshield
+      MONGODB_TEST_URI: mongodb://mongo:27017/campusshield_test
+      # Allow requests from the client service, which is on port 3000
+      CORS_ORIGIN: http://localhost:3000
+      NODE_ENV: development
+      # Copy other variables from your .env.example
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      RATE_LIMIT_WINDOW: 900000
+      LOG_LEVEL: info
+    depends_on:
+      - mongo
+    networks:
+      - campusshield-net
+
+  # Frontend Client Service
+  client:
+    build: ./client
+    container_name: campusshield-client
+    ports:
+      # Map host port 3000 to container port 80 (where Nginx is serving)
+      - "3000:80"
+    # The React app needs to know the backend URL at build time.
+    # Ensure REACT_APP_API_URL in client/.env is set to http://localhost:5000
+    # or the equivalent for your production domain.
+    depends_on:
+      - server
+    networks:
+      - campusshield-net
+
+volumes:
+  mongo-data:
+
+networks:
+  campusshield-net:
+    driver: bridge

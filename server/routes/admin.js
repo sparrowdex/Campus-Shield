@@ -5,7 +5,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 const moderator = require('../middleware/moderator');
-const memoryStore = require('../services/memoryStore');
+const memoryStore = require('../services/memoryStoreSingleton');
 const AdminRequest = require('../models/AdminRequest');
 const ChatRoom = require('../models/ChatRoom');
 

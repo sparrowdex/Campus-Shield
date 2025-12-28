@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
     minlength: 6
   },
   
+  refreshToken: {
+    type: String,
+  },
+  
   role: {
     type: String,
     enum: ['user', 'admin', 'moderator'],

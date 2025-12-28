@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const User = require('./models/User'); // Adjust path if needed
 
 // Replace with your MongoDB connection string
-const MONGO_URI = 'mongodb://localhost:27017/campusshield'; // Or use your .env value
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://mongo:27017/campusshield'; // Or use your .env value
 
 const users = [
   {
@@ -35,13 +35,6 @@ const users = [
     password: 'moderatorpassword2',
     role: 'moderator',
     anonymousId: 'moderator-anon-002'
-  },
-  {
-    name: 'Regular User',
-    email: 'user@example.com',
-    password: 'userpassword',
-    role: 'user',
-    anonymousId: 'user-anon-001'
   }
 ];
 

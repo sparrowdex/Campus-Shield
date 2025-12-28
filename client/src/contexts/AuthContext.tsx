@@ -31,9 +31,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, campusId?: string) => Promise<void>;
   loginAnonymous: (campusId?: string) => Promise<void>;
-  logout: () => void;
   updatePreferences: (preferences: any) => Promise<void>;
-  adminLogin: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  adminLogin: (email: string, password: string) => Promise<User>;
 }
 
 // Create context
@@ -69,8 +69,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password
       });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { accessToken, user } = response.data;
+      localStorage.setItem('token', accessToken);
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed');
@@ -85,8 +85,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         campusId
       });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { accessToken, user } = response.data;
+      localStorage.setItem('token', accessToken);
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed');
@@ -99,8 +99,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         campusId
       });
 
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { accessToken, user } = response.data;
+      localStorage.setItem('token', accessToken);
       setUser(user);
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Anonymous login failed');
@@ -127,15 +127,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email,
         password
       });
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
+      const { accessToken, user } = response.data;
+      localStorage.setItem('token', accessToken);
       setUser(user);
+      return user;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Admin login failed');
     }
   };
 
-  const value: AuthContextType & { adminLogin: typeof adminLogin } = {
+  const value: AuthContextType = {
     user,
     loading,
     login,

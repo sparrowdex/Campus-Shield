@@ -38,6 +38,12 @@ interface Report {
     message: string;
     addedAt: string;
   }>;
+  assignedTo?: {
+    _id: string;
+    anonymousId: string;
+    email: string;
+    role: string;
+  } | null;
 }
 
 const MyReports: React.FC = () => {
@@ -352,7 +358,9 @@ const MyReports: React.FC = () => {
                     </button>
                     <button
                       onClick={() => navigate(`/chat?reportId=${selectedReport.id}`)}
-                      className="btn-primary flex items-center"
+                      className={`btn-primary flex items-center ${!selectedReport.assignedTo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={!selectedReport.assignedTo}
+                      title={!selectedReport.assignedTo ? 'Chat is available once an admin has been assigned.' : 'Chat with the assigned admin'}
                     >
                       <ChatBubbleLeftRightIcon className="h-4 w-4 mr-2" />
                       Chat

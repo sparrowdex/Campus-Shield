@@ -17,6 +17,25 @@ router.post('/room', auth, async (req, res) => {
     if (!reportId) {
       return res.status(400).json({ success: false, message: 'reportId is required' });
     }
+
+    const report = await Report.findById(reportId);
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    // Ensure an admin is assigned to the report before allowing chat
+    if (!report.assignedTo) {
+      return res.status(403).json({ success: false, message: 'Chat is not available until an admin is assigned to this report.' });
+    }
+
+    // Only the reporter or the assigned admin can access the chat
+    const isReporter = String(report.reporterId) === String(req.user.userId);
+    const isAssignedAdmin = report.assignedTo && String(report.assignedTo) === String(req.user.userId);
+
+    if (!isReporter && !isAssignedAdmin) {
+      return res.status(403).json({ success: false, message: 'Access denied to this chat room.' });
+    }
+
     let room = await ChatRoom.findOne({ reportId });
     if (!room) {
       room = await ChatRoom.create({ reportId, participants: [req.user.userId] });

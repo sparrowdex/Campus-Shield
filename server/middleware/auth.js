@@ -13,14 +13,14 @@ const auth = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'your-access-secret-key');
     
     // Get user
     const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Token is not valid'
+        message: 'Access token is not valid'
       });
     }
 
@@ -47,7 +47,7 @@ const auth = async (req, res, next) => {
     console.error('Auth middleware error:', error);
     res.status(401).json({
       success: false,
-      message: 'Token is not valid'
+      message: 'Access token is not valid'
     });
   }
 };

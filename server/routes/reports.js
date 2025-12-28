@@ -6,8 +6,10 @@ const { body, validationResult, query } = require('express-validator');
 const Report = require('../models/Report');
 const auth = require('../middleware/auth');
 const { categorizeReport, analyzeSentiment } = require('../services/aiService');
-const memoryStore = require('../services/memoryStore');
+const memoryStore = require('../services/memoryStoreSingleton');
+const reportService = require('../services/reportService');
 
+const AppError = require('../utils/AppError');
 const router = express.Router();
 
 // Check if MongoDB is connected
@@ -107,73 +109,8 @@ router.post('/',
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const {
-      title,
-      description,
-      category,
-      location,
-      incidentTime
-    } = req.body;
-
-    // Get user info
-    const user = req.user;
-
-    // Process attachments
-    const attachments = req.files ? req.files.map(file => ({
-      filename: file.filename,
-      originalName: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size,
-      path: file.path
-    })) : [];
-
-    // Parse coordinates if sent as a string
-    let coordinates = location.coordinates;
-    if (typeof coordinates === 'string') {
-      try {
-        coordinates = JSON.parse(coordinates);
-      } catch (e) {
-        coordinates = undefined;
-      }
-    }
-
-    // Create report data
-    const reportData = {
-      reporterId: user.userId,
-      title,
-      description,
-      category,
-      location: {
-        type: 'Point',
-        coordinates: coordinates || location.coordinates,
-        address: location.address || '',
-        building: location.building || '',
-        floor: location.floor || ''
-      },
-      incidentTime: incidentTime || new Date(),
-      attachments,
-      isAnonymous: user.isAnonymous || true,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    };
-
     if (isMongoConnected()) {
-      // Create report in MongoDB
-      const report = await Report.create(reportData);
-
-      // AI processing (async - don't block response)
-      try {
-        const aiCategory = await categorizeReport(description);
-        const sentiment = await analyzeSentiment(description);
-        
-        report.aiCategory = aiCategory;
-        report.sentiment = sentiment;
-        await report.save();
-      } catch (aiError) {
-        console.error('AI processing error:', aiError);
-        // Continue without AI processing
-      }
-
+      const report = await reportService.createReport(req.body, req.user, req.files);
       res.status(201).json({
         success: true,
         report: {
@@ -187,19 +124,25 @@ router.post('/',
     } else {
       // Create report in memory store
       const reportDataForMemory = {
-        userId: user.userId,
-        title,
-        description,
-        category,
+        userId: req.user.userId,
+        title: req.body.title,
+        description: req.body.description,
+        category: req.body.category,
         location: {
-          address: location.address || '',
-          building: location.building || '',
-          floor: location.floor || '',
-          coordinates: coordinates || location.coordinates
+          address: req.body.location.address || '',
+          building: req.body.location.building || '',
+          floor: req.body.location.floor || '',
+          coordinates: req.body.location.coordinates
         },
-        incidentTime: incidentTime || new Date().toISOString(),
-        attachments,
-        isAnonymous: user.isAnonymous || true
+        incidentTime: req.body.incidentTime || new Date().toISOString(),
+        attachments: req.files ? req.files.map(file => ({
+            filename: file.filename,
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            path: file.path
+        })) : [],
+        isAnonymous: req.user.isAnonymous || true
       };
 
       const report = memoryStore.createReport(reportDataForMemory);
@@ -345,7 +288,8 @@ router.get('/', auth, [
           incidentTime: report.incidentTime,
           createdAt: report.createdAt,
           attachments: report.attachments || [],
-          publicUpdates: report.publicUpdates || []
+          publicUpdates: report.publicUpdates || [],
+          assignedTo: report.assignedTo || null
         })),
         pagination: {
           page: parseInt(page),
@@ -368,7 +312,7 @@ router.get('/', auth, [
 // @route   GET /api/reports/:id
 // @desc    Get specific report
 // @access  Private
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params;
     const user = req.user;
@@ -378,18 +322,12 @@ router.get('/:id', auth, async (req, res) => {
       .populate('adminNotes.addedBy', 'anonymousId email role');
 
     if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: 'Report not found'
-      });
+      return next(new AppError('Report not found', 404));
     }
 
     // Check access permissions
     if (user.role === 'user' && report.reporterId.toString() !== user.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      return next(new AppError('Access denied', 403));
     }
 
     res.json({
@@ -415,11 +353,7 @@ router.get('/:id', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get report error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    next(error);
   }
 });
 

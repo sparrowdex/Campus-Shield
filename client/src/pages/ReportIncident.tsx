@@ -206,7 +206,7 @@ const ReportIncident: React.FC = () => {
       formDataToSend.append('title', formData.title);
       formDataToSend.append('description', formData.description);
       formDataToSend.append('category', formData.category);
-      formDataToSend.append('incidentTime', formData.incidentTime);
+      formDataToSend.append('incidentTime', new Date(formData.incidentTime).toISOString());
       
       if (formData.location.coordinates) {
         formDataToSend.append('location[coordinates]', JSON.stringify(formData.location.coordinates));

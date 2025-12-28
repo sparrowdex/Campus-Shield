@@ -300,4 +300,4 @@ class MemoryStore {
   }
 }
 
-module.exports = new MemoryStore(); 
+module.exports = MemoryStore; 

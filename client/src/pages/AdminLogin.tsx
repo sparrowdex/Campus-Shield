@@ -35,10 +35,8 @@ const AdminLogin: React.FC = () => {
     setError('');
 
     try {
-      await adminLogin(formData.email, formData.password);
-      // After login, user state is set in context
-      // Redirect based on role
-      const loggedInUser = user || JSON.parse(localStorage.getItem('user') || '{}');
+      const loggedInUser = await adminLogin(formData.email, formData.password);
+
       if (loggedInUser.role === 'moderator') {
         navigate('/admin/requests');
       } else if (loggedInUser.role === 'admin') {

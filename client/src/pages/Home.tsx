@@ -76,34 +76,37 @@ const Home: React.FC = () => {
               Help create a safer campus community.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {user?.role === 'user' && (
+              {user ? (
                 <>
-                  <Link to="/report" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
-                    Report Incident
-                  </Link>
-                  <Link to="/my-reports" className="btn-secondary bg-transparent border-white text-white hover:bg-white hover:text-primary-600">
-                    View My Reports
-                  </Link>
+                  {user.role === 'user' && (
+                    <>
+                      <Link to="/report" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
+                        Report Incident
+                      </Link>
+                      <Link to="/my-reports" className="btn-secondary bg-transparent border-white text-white hover:bg-white hover:text-primary-600">
+                        View My Reports
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'admin' && (
+                    <>
+                      <Link to="/admin" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
+                        Admin Dashboard
+                      </Link>
+                      <Link to="/chat" className="btn-secondary bg-transparent border-white text-white hover:bg-white hover:text-primary-600">
+                        Chat
+                      </Link>
+                    </>
+                  )}
+                  {user.role === 'moderator' && (
+                    <>
+                      <Link to="/admin/requests" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
+                        Admin Requests
+                      </Link>
+                    </>
+                  )}
                 </>
-              )}
-              {user?.role === 'admin' && (
-                <>
-                  <Link to="/admin" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
-                    Admin Dashboard
-                  </Link>
-                  <Link to="/chat" className="btn-secondary bg-transparent border-white text-white hover:bg-white hover:text-primary-600">
-                    Chat
-                  </Link>
-                </>
-              )}
-              {user?.role === 'moderator' && (
-                <>
-                  <Link to="/admin/requests" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
-                    Admin Requests
-                  </Link>
-                </>
-              )}
-              {!user && (
+              ) : (
                 <>
                   <Link to="/register" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
                     Get Started
@@ -225,12 +228,12 @@ const Home: React.FC = () => {
           </p>
           {user ? (
             <>
-              {user?.role === 'user' && (
+              {user.role === 'user' && (
                 <Link to="/report" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
                   Report an Incident
                 </Link>
               )}
-              {user?.role === 'admin' && (
+              {user.role === 'admin' && (
                 <>
                   <Link to="/admin" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
                     Admin Dashboard
@@ -240,22 +243,12 @@ const Home: React.FC = () => {
                   </Link>
                 </>
               )}
-              {user?.role === 'moderator' && (
+              {user.role === 'moderator' && (
                 <>
                   <Link to="/admin/requests" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
                     Admin Requests
                   </Link>
                 </>
-              )}
-              {!user && (
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Link to="/register" className="btn-primary bg-white text-primary-600 hover:bg-gray-100">
-                    Get Started Now
-                  </Link>
-                  <Link to="/login" className="btn-secondary bg-transparent border-white text-white hover:bg-white hover:text-primary-600">
-                    Login
-                  </Link>
-                </div>
               )}
             </>
           ) : (

@@ -12,6 +12,7 @@ import ReportIncident from './pages/ReportIncident';
 import MyReports from './pages/MyReports';
 import AdminDashboard from './pages/AdminDashboard';
 import Chat from './pages/Chat';
+import UserDashboard from './pages/UserDashboard'; // New import
 import LoadingSpinner from './components/common/LoadingSpinner';
 import ModeratorDashboard from './pages/ModeratorDashboard';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -30,7 +31,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean;
   if (loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />;
-  if (moderatorOnly && user.role !== 'moderator') return <Navigate to="/" replace />;
+  if (moderatorOnly && user.role !== 'moderator' && user.role !== 'admin') return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -108,6 +109,14 @@ const AppContent: React.FC = () => {
             element={
               <ProtectedRoute moderatorOnly>
                 <ModeratorDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard" // New route for user dashboard
+            element={
+              <ProtectedRoute>
+                <UserDashboard />
               </ProtectedRoute>
             }
           />
